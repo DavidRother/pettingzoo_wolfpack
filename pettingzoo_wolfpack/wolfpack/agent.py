@@ -1,5 +1,5 @@
 import numpy as np
-from gym_env.wolfpack.config import Config
+from pettingzoo_wolfpack.wolfpack.config import Config
 
 
 class Agent(object):

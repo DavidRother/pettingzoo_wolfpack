@@ -1,7 +1,7 @@
-import gym
+import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
-from gym_env.wolfpack.base import Base
+from pettingzoo_wolfpack.wolfpack.base import Base
 
 
 class WolfPackEnv(Base):
@@ -9,8 +9,8 @@ class WolfPackEnv(Base):
     REWARD_TEAM = 5.
     CAPTURE_RADIUS = 6.
 
-    def __init__(self, args, log):
-        super(WolfPackEnv, self).__init__(log=log, args=args)
+    def __init__(self, env_name, ep_max_timesteps, n_predator, prefix, seed):
+        super(WolfPackEnv, self).__init__(env_name, ep_max_timesteps, n_predator, prefix, seed)
 
         self.observation_shape = (11, 11, 3)  # Format: (height, width, channel)
         self.observation_space = gym.spaces.Box(low=0., high=1., shape=self.observation_shape)
@@ -20,7 +20,7 @@ class WolfPackEnv(Base):
         self.base_gridmap_array = self._load_gridmap_array()
         self.base_gridmap_image = self._to_image(self.base_gridmap_array)
 
-    def reset(self):
+    def reset(self, **kwargs):
         self._reset_agents()
         gridmap_image = self._render_gridmap()
 
@@ -32,7 +32,7 @@ class WolfPackEnv(Base):
         return observations
 
     def step(self, actions):
-        assert len(actions) == self.args.n_predator + 1
+        assert len(actions) == self.n_predator + 1
 
         # Compute next locations
         for agent, action in zip(self.agents, actions):

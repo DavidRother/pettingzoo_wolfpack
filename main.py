@@ -11,10 +11,10 @@ def main(args):
         os.makedirs("./logs")
 
     # Set logs
-    log = set_log(args)
+    # log = set_log(args)
 
     # Create env
-    env = make_env(log, args)
+    env = make_env(args)
 
     # Set seeds
     random.seed(args.seed)
@@ -22,7 +22,7 @@ def main(args):
     env.seed(args.seed)
 
     # Visualize environment
-    observations = env.reset()
+    observations = env.reset
 
     for _ in range(args.ep_max_timesteps):
         env.render()

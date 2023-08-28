@@ -1,16 +1,20 @@
 import os
 import gym
 import numpy as np
-from gym_env.wolfpack.config import Config
-from gym_env.wolfpack.agent import Agent
+from pettingzoo_wolfpack.wolfpack.config import Config
+from pettingzoo_wolfpack.wolfpack.agent import Agent
 
 
 class Base(gym.Env):
-    def __init__(self, log, args):
+
+    def __init__(self, env_name, ep_max_timesteps, n_predator, prefix, seed):
         super(Base, self).__init__()
 
-        self.log = log
-        self.args = args
+        self.env_name = env_name
+        self.ep_max_timesteps = ep_max_timesteps
+        self.n_predator = n_predator
+        self.prefix = prefix
+        self.seed = seed
         self.config = Config()
 
     def _load_gridmap_array(self):

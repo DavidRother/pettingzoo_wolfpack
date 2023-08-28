@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import logging
 
 
@@ -28,9 +28,9 @@ def set_log(args):
     return log
 
 
-def make_env(log, args):
-    import gym_env  # noqa
-    env = gym.make(args.env_name, log=log, args=args)
+def make_env(args):
+    import pettingzoo_wolfpack  # noqa
+    env = gym.make(args.env_name, args=args)
     env._max_episode_steps = args.ep_max_timesteps
 
     return env
