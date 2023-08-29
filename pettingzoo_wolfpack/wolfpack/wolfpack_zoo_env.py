@@ -13,7 +13,7 @@ from pettingzoo.utils.env import ObsType, ActionType
 from pettingzoo_wolfpack.wolfpack.wolfpack_env import WolfPackEnv
 
 
-def env(env_name, ep_max_timesteps, n_predator, prefix, seed):
+def env(env_name, ep_max_timesteps, n_predator, prefix, seed, obs="vector"):
     """
     The env function wraps the environment in 3 wrappers by default. These
     wrappers contain logic that is common to many pettingzoo environments.
@@ -21,7 +21,7 @@ def env(env_name, ep_max_timesteps, n_predator, prefix, seed):
     to provide sane error messages. You can find full documentation for these methods
     elsewhere in the developer documentation.
     """
-    env_init = WolfpackEnvironment(env_name, ep_max_timesteps, n_predator, prefix, seed)
+    env_init = WolfpackEnvironment(env_name, ep_max_timesteps, n_predator, prefix, seed, obs)
     env_init = wrappers.CaptureStdoutWrapper(env_init)
     env_init = wrappers.OrderEnforcingWrapper(env_init)
     return env_init
@@ -41,16 +41,16 @@ class WolfpackEnvironment(AECEnv):
         "render_fps": 20,
     }
 
-    def __init__(self, env_name, ep_max_timesteps, n_predator, prefix, seed):
+    def __init__(self, env_name, ep_max_timesteps, n_predator, prefix, seed, obs):
         super().__init__()
-        self.foraging_env = WolfPackEnv(env_name, ep_max_timesteps, n_predator, prefix, seed)
-        self.possible_agents = ["player_" + str(r) for r in range(players)]
+        self.wolfpack_env = WolfPackEnv(env_name, ep_max_timesteps, n_predator, prefix, seed, obs)
+        self.possible_agents = ["player_" + str(r) for r in range(n_predator + 1)]
         self.agents = self.possible_agents[:]
         self.t = 0
 
         self.termination_info = ""
-        self.observation_spaces = {agent: self.foraging_env.observation_space[0] for agent in self.possible_agents}
-        self.action_spaces = {agent: self.foraging_env.action_space[0] for agent in self.possible_agents}
+        self.observation_spaces = {agent: self.wolfpack_env.observation_space for agent in self.possible_agents}
+        self.action_spaces = {agent: self.wolfpack_env.action_space for agent in self.possible_agents}
         self.has_reset = True
         self.agent_name_mapping = dict(zip(self.possible_agents, list(range(len(self.possible_agents)))))
         self.agent_selection = None
@@ -83,7 +83,7 @@ class WolfpackEnvironment(AECEnv):
     def accumulated_step(self, actions):
         # Track internal environment info.
         self.t += 1
-        nobs, nreward, nterminated, ntruncated, ninfo = self.foraging_env.step(actions)
+        nobs, nreward, nterminated, ntruncated, ninfo = self.wolfpack_env.step(actions)
 
         for idx, agent in enumerate(self.agents):
             self.rewards[agent] = nreward[idx]
@@ -103,7 +103,7 @@ class WolfpackEnvironment(AECEnv):
         self._agent_selector.reinit(self.agents)
         self.agent_selection = self._agent_selector.next()
 
-        nobs, ninfo = self.foraging_env.reset
+        nobs, ninfo = self.wolfpack_env.reset()
 
         # Get an image observation
         self.agent_name_mapping = dict(zip(self.possible_agents, list(range(len(self.possible_agents)))))
@@ -119,7 +119,7 @@ class WolfpackEnvironment(AECEnv):
         return self.agent_observations[agent]
 
     def render(self) -> None | np.ndarray | str | list:
-        return self.foraging_env.render()
+        return self.wolfpack_env.render()
 
     def state(self) -> np.ndarray:
         pass

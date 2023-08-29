@@ -1,36 +1,10 @@
 import gymnasium as gym
-import logging
 
 
-def set_logger(logger_name, log_file, level=logging.INFO):
-    log = logging.getLogger(logger_name)
-    formatter = logging.Formatter('%(asctime)s : %(message)s')
-    fileHandler = logging.FileHandler(log_file, mode='w')
-    fileHandler.setFormatter(formatter)
-    streamHandler = logging.StreamHandler()
-    streamHandler.setFormatter(formatter)
-
-    log.setLevel(level)
-    log.addHandler(fileHandler)
-    log.addHandler(streamHandler)
-
-
-def set_log(args):
-    log = {}                                                                                                                                        
-    set_logger(
-        logger_name=args.log_name, 
-        log_file=r'{0}{1}'.format("./logs/", args.log_name))
-    log[args.log_name] = logging.getLogger(args.log_name)
-
-    for arg, value in sorted(vars(args).items()):
-        log[args.log_name].info("%s: %r", arg, value)
-
-    return log
-
-
-def make_env(args):
+def make_env(env_id, ep_max_timesteps, n_predator, prefix, seed):
     import pettingzoo_wolfpack  # noqa
-    env = gym.make(args.env_name, args=args)
-    env._max_episode_steps = args.ep_max_timesteps
+    env = gym.make(env_id, env_name=env_id, ep_max_timesteps=ep_max_timesteps,
+                   n_predator=n_predator, prefix=prefix, seed=seed)
+    env._max_episode_steps = ep_max_timesteps
 
     return env
