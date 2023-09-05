@@ -19,7 +19,7 @@ class Base(gym.Env):
 
     def _load_gridmap_array(self):
         # Ref: https://github.com/xinleipan/gym-gridworld/blob/master/gym_gridworld/envs/gridworld_env.py
-        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "maze.txt")
+        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../maps/maze.txt")
         with open(path, 'r') as f:
             gridmap = f.readlines()
 

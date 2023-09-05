@@ -8,11 +8,12 @@ from pettingzoo_wolfpack.wolfpack.agent import Agent
 
 
 class WolfPackEnv:
-    REWARD_LONELY = 1.
-    REWARD_TEAM = 5.
-    CAPTURE_RADIUS = 6.
+    REWARD_LONELY = -0.5
+    REWARD_TEAM = 4.
+    CAPTURE_RADIUS = 4.
 
-    def __init__(self, env_name, ep_max_timesteps, n_predator, prefix, seed, obs="vector"):
+    def __init__(self, env_name, ep_max_timesteps, n_predator, prefix, seed, obs="vector", agent_respawn_rate=0.0,
+                 grace_period=20, agent_despawn_rate=0.0):
         self.env_name = env_name
         self.ep_max_timesteps = ep_max_timesteps
         self.n_predator = n_predator
@@ -21,10 +22,11 @@ class WolfPackEnv:
         self.config = Config()
         self.obs = obs
         if obs == "vector":
-            self.observation_shape = (self.n_predator * 2 + 2, 2)
+            self.observation_shape = (self.n_predator * 3 + 3, )
+            self.observation_space = gym.spaces.Box(low=0., high=20., shape=self.observation_shape)
         else:
             self.observation_shape = (11, 11, 3)  # Format: (height, width, channel)
-        self.observation_space = gym.spaces.Box(low=0., high=1., shape=self.observation_shape)
+            self.observation_space = gym.spaces.Box(low=0., high=1., shape=self.observation_shape)
         self.action_space = gym.spaces.Discrete(len(self.config.action_dict))
         self.pad = np.max(self.observation_shape) - 2
 
@@ -32,21 +34,31 @@ class WolfPackEnv:
         self.base_gridmap_image = self._to_image(self.base_gridmap_array)
         self.agents = []
         self.current_step = 0
+        self.agent_respawn_rate = agent_respawn_rate
+        self.grace_period = grace_period
+        self.agent_despawn_rate = agent_despawn_rate
+        self.agent_grace_period = [self.grace_period] * self.n_predator
+        self.active_predators = [True] * self.n_predator
 
     def reset(self, **kwargs):
+        self.current_step = 0
         self._reset_agents()
 
         gridmap_image = self._render_gridmap()
 
         observations = []
-        for agent in self.agents:
+        for idx, agent in enumerate(self.agents):
             if self.obs == "vector":
                 observation = self._get_observation_vector(agent)
             else:
                 observation = self._get_observation(agent, gridmap_image)
             observations.append(observation)
 
-        infos = [{} for _ in range(len(self.agents))]
+        infos = [{"action": 0, "task": "hunting"} if idx != 0 else {"action": 0, "task": "running"}
+                 for idx, player in enumerate(self.agents)]
+
+        self.agent_grace_period = [self.grace_period] * self.n_predator
+        self.active_predators = [True] * self.n_predator
 
         return observations, infos
 
@@ -54,10 +66,12 @@ class WolfPackEnv:
         assert len(actions) == self.n_predator + 1
 
         # Compute next locations
-        for agent, action in zip(self.agents, actions):
+        for idx, (agent, action) in enumerate(zip(self.agents, actions)):
+            if idx and not self.active_predators[idx - 1]:
+                continue
             action = list(self.config.action_dict.keys())[action]
 
-            if "spin" not in action: 
+            if "spin" not in action:
                 next_location = agent.location + self.config.action_dict[action]
                 next_orientation = agent.orientation
             else:
@@ -66,20 +80,18 @@ class WolfPackEnv:
             agent.location = next_location
             agent.orientation = next_orientation
 
-        # Get next observations
-        gridmap_image = self._render_gridmap()
-
-        observations = []
-        for agent in self.agents:
-            if self.obs == "vector":
-                observation = self._get_observation_vector(agent)
+        for i in range(self.n_predator):
+            if self.agent_grace_period[i] > 0:
+                self.agent_grace_period[i] -= 1
             else:
-                observation = self._get_observation(agent, gridmap_image)
-            observations.append(observation)
+                if self.active_predators[i] and np.random.random() < self.agent_despawn_rate:
+                    self.despawn_agent(i)
+                elif not self.active_predators[i] and np.random.random() < self.agent_respawn_rate:
+                    self.respawn_agent(i)
 
         # Find who succeeded in hunting
         hunted_predator = None
-        for predator in self.agents[1:]:
+        for idx, predator in enumerate(self.agents[1:]):
             if np.array_equal(self.agents[0].location, predator.location):
                 hunted_predator = predator
 
@@ -98,13 +110,14 @@ class WolfPackEnv:
             if len(nearby_predators) == 0:
                 rewards[hunted_predator.id] = self.REWARD_LONELY
             else:
-                rewards[hunted_predator.id] = self.REWARD_TEAM
+                rewards[hunted_predator.id] = 2 * (len(nearby_predators) + 1)
                 for neaby_predator in nearby_predators:
-                    rewards[neaby_predator.id] = self.REWARD_TEAM
+                    rewards[neaby_predator.id] = 2 * (len(nearby_predators) + 1)
 
         # Compute done
         if hunted_predator is not None:
-            done = [True] * len(self.agents)
+            self.agents[0].reset_location()
+            done = [False] * len(self.agents)
         else:
             done = [False] * len(self.agents)
 
@@ -113,7 +126,22 @@ class WolfPackEnv:
             truncated = [True] * len(self.agents)
         else:
             truncated = [False] * len(self.agents)
-        info = [{} for _ in range(len(self.agents))]
+
+        # Get next observations
+        gridmap_image = self._render_gridmap()
+
+        observations = []
+        for idx, agent in enumerate(self.agents):
+            if idx and not self.active_predators[idx - 1]:
+                continue
+            if self.obs == "vector":
+                observation = self._get_observation_vector(agent)
+            else:
+                observation = self._get_observation(agent, gridmap_image)
+            observations.append(observation)
+
+        info = [{"action": actions[idx], "task": "hunting"} if idx != 0 else {"action": actions[idx], "task": "running"}
+                for idx, player in enumerate(self.agents)]
         return observations, rewards, done, truncated, info
   
     def render(self, mode='human'):
@@ -127,7 +155,7 @@ class WolfPackEnv:
 
     def _load_gridmap_array(self):
         # Ref: https://github.com/xinleipan/gym-gridworld/blob/master/gym_gridworld/envs/gridworld_env.py
-        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "maze.txt")
+        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../maps/maze.txt")
         with open(path, 'r') as f:
             gridmap = f.readlines()
 
@@ -225,3 +253,12 @@ class WolfPackEnv:
             observation_vector.append(agent.location[1])
             observation_vector.append(agent.orientation)
         return observation_vector
+
+    def despawn_agent(self, index):
+        self.active_predators[index] = False
+        # Additional logic for despawning an agent if any
+
+    def respawn_agent(self, index):
+        self.active_predators[index] = True
+        self.agent_grace_period[index] = self.grace_period
+        self.agents[index + 1].reset_location()

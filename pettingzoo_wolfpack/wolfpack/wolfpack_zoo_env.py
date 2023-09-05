@@ -13,7 +13,8 @@ from pettingzoo.utils.env import ObsType, ActionType
 from pettingzoo_wolfpack.wolfpack.wolfpack_env import WolfPackEnv
 
 
-def env(env_name, ep_max_timesteps, n_predator, prefix, seed, obs="vector"):
+def env(env_name, ep_max_timesteps, n_predator, prefix, seed, obs="vector", agent_respawn_rate=0.0,
+                 grace_period=20, agent_despawn_rate=0.0):
     """
     The env function wraps the environment in 3 wrappers by default. These
     wrappers contain logic that is common to many pettingzoo environments.
@@ -21,7 +22,8 @@ def env(env_name, ep_max_timesteps, n_predator, prefix, seed, obs="vector"):
     to provide sane error messages. You can find full documentation for these methods
     elsewhere in the developer documentation.
     """
-    env_init = WolfpackEnvironment(env_name, ep_max_timesteps, n_predator, prefix, seed, obs)
+    env_init = WolfpackEnvironment(env_name, ep_max_timesteps, n_predator, prefix, seed, obs, agent_respawn_rate,
+                                   grace_period, agent_despawn_rate)
     env_init = wrappers.CaptureStdoutWrapper(env_init)
     env_init = wrappers.OrderEnforcingWrapper(env_init)
     return env_init
@@ -41,9 +43,11 @@ class WolfpackEnvironment(AECEnv):
         "render_fps": 20,
     }
 
-    def __init__(self, env_name, ep_max_timesteps, n_predator, prefix, seed, obs):
+    def __init__(self, env_name, ep_max_timesteps, n_predator, prefix, seed, obs, agent_respawn_rate=0.0,
+                 grace_period=20, agent_despawn_rate=0.0):
         super().__init__()
-        self.wolfpack_env = WolfPackEnv(env_name, ep_max_timesteps, n_predator, prefix, seed, obs)
+        self.wolfpack_env = WolfPackEnv(env_name, ep_max_timesteps, n_predator, prefix, seed, obs, agent_respawn_rate,
+                                        grace_period, agent_despawn_rate)
         self.possible_agents = ["player_" + str(r) for r in range(n_predator + 1)]
         self.agents = self.possible_agents[:]
         self.t = 0
@@ -86,6 +90,9 @@ class WolfpackEnvironment(AECEnv):
         nobs, nreward, nterminated, ntruncated, ninfo = self.wolfpack_env.step(actions)
 
         for idx, agent in enumerate(self.agents):
+            if idx and not self.wolfpack_env.active_predators[idx - 1]:
+                self.agents.remove(agent)
+                continue
             self.rewards[agent] = nreward[idx]
             self.terminations[agent] = nterminated[idx]
             self.truncations[agent] = ntruncated[idx]

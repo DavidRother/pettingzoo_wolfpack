@@ -10,10 +10,10 @@ class Agent(object):
 
         self.config = Config()
 
-        self._location = self._reset_location()
+        self._location = self.reset_location()
         self._orientation = self.config.orientation_dict["up"]
 
-    def _reset_location(self):
+    def reset_location(self):
         location = np.array([
             np.random.choice(self.base_gridmap_array.shape[0]), 
             np.random.choice(self.base_gridmap_array.shape[1])])
