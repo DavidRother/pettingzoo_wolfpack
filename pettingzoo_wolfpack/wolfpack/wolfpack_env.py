@@ -39,6 +39,7 @@ class WolfPackEnv:
         self.agent_despawn_rate = agent_despawn_rate
         self.agent_grace_period = [self.grace_period] * self.n_predator
         self.active_predators = [True] * self.n_predator
+        self.status_changed = [False] * self.n_predator
 
     def reset(self, **kwargs):
         self.current_step = 0
@@ -59,11 +60,13 @@ class WolfPackEnv:
 
         self.agent_grace_period = [self.grace_period] * self.n_predator
         self.active_predators = [True] * self.n_predator
+        self.status_changed = [False] * self.n_predator
 
         return observations, infos
 
     def step(self, actions):
         assert len(actions) == self.n_predator + 1
+        self.status_changed = [False] * self.n_predator
 
         # Compute next locations
         for idx, (agent, action) in enumerate(zip(self.agents, actions)):
@@ -98,7 +101,9 @@ class WolfPackEnv:
         # Find nearby predators to the one succeeded in hunting
         nearby_predators = []
         if hunted_predator is not None:
-            for predator in self.agents[1:]:
+            for idx, predator in enumerate(self.agents[1:]):
+                if not self.status_changed[idx] and not self.active_predators[idx]:
+                    continue
                 if predator.id != hunted_predator.id:
                     dist = np.linalg.norm(predator.location - hunted_predator.location)
                     if dist < self.CAPTURE_RADIUS:
@@ -256,9 +261,11 @@ class WolfPackEnv:
 
     def despawn_agent(self, index):
         self.active_predators[index] = False
+        self.status_changed[index] = True
         # Additional logic for despawning an agent if any
 
     def respawn_agent(self, index):
         self.active_predators[index] = True
+        self.status_changed[index] = True
         self.agent_grace_period[index] = self.grace_period
         self.agents[index + 1].reset_location()

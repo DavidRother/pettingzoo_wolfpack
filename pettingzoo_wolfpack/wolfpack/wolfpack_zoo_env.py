@@ -93,6 +93,7 @@ class WolfpackEnvironment(AECEnv):
             if idx and not self.wolfpack_env.active_predators[idx - 1]:
                 self.agents.remove(agent)
                 continue
+
             self.rewards[agent] = nreward[idx]
             self.terminations[agent] = nterminated[idx]
             self.truncations[agent] = ntruncated[idx]
