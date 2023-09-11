@@ -14,36 +14,47 @@ def main(env_id, ep_max_timesteps, n_predator, prefix, seed, obs):
 
     # Create env
     env = parallel_env(env_name=env_id, ep_max_timesteps=ep_max_timesteps, n_predator=n_predator,
-                       prefix=prefix, seed=seed, obs=obs)
+                       prefix=prefix, seed=seed, obs=obs, agent_respawn_rate=0.1, grace_period=20,
+                       agent_despawn_rate=0.1)
 
     # Set seeds
     random.seed(seed)
     np.random.seed(seed)
 
-    accumulated_rewards = {"player_0": 0, "player_1": 0, "player_2": 0}
+    accumulated_rewards = {"player_0": 0, "player_1": 0, "player_2": 0, "player_3": 0}
     prey_agent = PreyAgentH1()
 
     # Visualize environment
     observations, infos = env.reset()
+    done = {"player_0": False, "player_1": False, "player_2": False, "player_3": False}
+    truncated = {"player_0": False, "player_1": False, "player_2": False, "player_3": False}
     steps = 0
     while True:
         # env.render()
         steps += 1
-        prey_action = env.action_space("player_0").sample()
-        prey_move = prey_agent.step(observations["player_0"])
-        predator1_action = env.action_space("player_1").sample()
-        predator2_action = env.action_space("player_2").sample()
-        actions = {"player_0": prey_action, "player_1": predator1_action, "player_2": predator2_action}
+        actions = {}
+        if "player_0" in observations and not truncated["player_0"] and not done["player_0"]:
+            prey_action = env.action_space("player_0").sample()
+            actions["player_0"] = prey_action
+        if "player_1" in observations and not truncated["player_1"] and not done["player_1"]:
+            predator1_action = env.action_space("player_1").sample()
+            actions["player_1"] = predator1_action
+        if "player_2" in observations and not truncated["player_2"] and not done["player_2"]:
+            predator2_action = env.action_space("player_2").sample()
+            actions["player_2"] = predator2_action
+        if "player_3" in observations and not truncated["player_3"] and not done["player_3"]:
+            predator3_action = env.action_space("player_3").sample()
+            actions["player_3"] = predator3_action
 
         observations, reward, done, truncated, infos = env.step(actions)
-
-        for agent_id in accumulated_rewards.keys():
+        print(truncated)
+        for agent_id in accumulated_rewards:
             accumulated_rewards[agent_id] += reward[agent_id]
 
-        if any(done.values()):
+        if all(done.values()):
             break
 
-        if any(truncated.values()):
+        if all(truncated.values()):
             break
 
     print(accumulated_rewards)
@@ -53,7 +64,7 @@ def main(env_id, ep_max_timesteps, n_predator, prefix, seed, obs):
 if __name__ == "__main__":
     m_env_id = "wolfpack-v0"
     m_ep_max_timesteps = 150
-    m_n_predator = 2
+    m_n_predator = 3
     m_prefix = ""
     m_seed = 1
     m_obs = "vector"

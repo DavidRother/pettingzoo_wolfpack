@@ -14,7 +14,7 @@ from pettingzoo_wolfpack.wolfpack.wolfpack_env import WolfPackEnv
 
 
 def env(env_name, ep_max_timesteps, n_predator, prefix, seed, obs="vector", agent_respawn_rate=0.0,
-                 grace_period=20, agent_despawn_rate=0.0):
+        grace_period=20, agent_despawn_rate=0.0):
     """
     The env function wraps the environment in 3 wrappers by default. These
     wrappers contain logic that is common to many pettingzoo environments.
@@ -71,6 +71,25 @@ class WolfpackEnvironment(AECEnv):
         self.agent_observations = {agent: None for agent in self.possible_agents}
 
     def step(self, action: ActionType) -> None:
+        # if self._agent_selector.is_first():
+        #     self.agents = [agent for idx, agent in enumerate(self.possible_agents[:])
+        #                    if self.wolfpack_env.active_agents[idx]]
+        #
+        #     if any(self.wolfpack_env.status_changed):
+        #         self._agent_selector = agent_selector(self.agents)
+        #         self.agent_selection = self._agent_selector.next()
+        if action is None:
+            # self.agents.remove(agent)
+            # self._agent_selector = agent_selector(self.agents)
+            # self.agent_selection = self._agent_selector.next()
+            if any(self.wolfpack_env.status_changed):
+                self.agents = [agent for idx, agent in enumerate(self.possible_agents[:])
+                               if self.wolfpack_env.active_agents[idx]]
+                self._agent_selector = agent_selector(self.agents)
+                if not self.agents:
+                    return
+                self.agent_selection = self._agent_selector.next()
+            return
         if self.terminations[self.agent_selection] or self.truncations[self.agent_selection]:
             self._was_dead_step(action)
             return
@@ -81,6 +100,11 @@ class WolfpackEnvironment(AECEnv):
         if self._agent_selector.is_last():
             self.accumulated_step(self.accumulated_actions)
             self.accumulated_actions = []
+            for ag in self.agents:
+                if self.terminations[ag] or self.truncations[ag]:
+                    self.agent_selection = ag
+                    self._cumulative_rewards[agent] = 0
+                    return
         self.agent_selection = self._agent_selector.next()
         self._cumulative_rewards[agent] = 0
 
@@ -89,17 +113,31 @@ class WolfpackEnvironment(AECEnv):
         self.t += 1
         nobs, nreward, nterminated, ntruncated, ninfo = self.wolfpack_env.step(actions)
 
-        for idx, agent in enumerate(self.agents):
-            if idx and not self.wolfpack_env.active_predators[idx - 1]:
-                self.agents.remove(agent)
+        self.rewards = {}
+        self.terminations = {}
+        self.truncations = {}
+        self.infos = {}
+        self.agent_observations = {}
+
+        offset_idx = 0
+        for idx, agent in enumerate(self.possible_agents[:]):
+            if not (self.wolfpack_env.active_agents[idx] or self.wolfpack_env.status_changed[idx]):
+                offset_idx += 1
                 continue
 
-            self.rewards[agent] = nreward[idx]
-            self.terminations[agent] = nterminated[idx]
-            self.truncations[agent] = ntruncated[idx]
-            self.infos[agent] = ninfo[idx]
-            self._cumulative_rewards[agent] += nreward[idx]
-            self.agent_observations[agent] = nobs[idx]
+            self.rewards[agent] = nreward[idx - offset_idx]
+            self.terminations[agent] = nterminated[idx - offset_idx]
+            self.truncations[agent] = ntruncated[idx - offset_idx]
+            self.infos[agent] = ninfo[idx - offset_idx]
+            self._cumulative_rewards[agent] += nreward[idx - offset_idx]
+            self.agent_observations[agent] = nobs[idx - offset_idx]
+
+        self.agents = [agent for idx, agent in enumerate(self.possible_agents[:])
+                       if self.wolfpack_env.active_agents[idx] or self.wolfpack_env.status_changed[idx]]
+        self._agent_selector = agent_selector(self.agents)
+
+        # if any(self.wolfpack_env.status_changed):
+        #     self._agent_selector = agent_selector(self.agents)
 
     def reset(self, seed: int | None = None, options: dict | None = None) -> None:
         self.t = 0
