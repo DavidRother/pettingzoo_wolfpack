@@ -151,7 +151,6 @@ class WolfpackEnvironment(AECEnv):
 
         nobs, ninfo = self.wolfpack_env.reset()
 
-        # Get an image observation
         self.agent_name_mapping = dict(zip(self.possible_agents, list(range(len(self.possible_agents)))))
         self.rewards = dict(zip(self.agents, [0 for _ in self.agents]))
         self._cumulative_rewards = dict(zip(self.agents, [0 for _ in self.agents]))

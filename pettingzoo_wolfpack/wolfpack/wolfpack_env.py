@@ -125,7 +125,7 @@ class WolfPackEnv:
         if self.current_step >= self.ep_max_timesteps:
             truncated = [True] * len(self.relevant_agents)
             self.active_agents = [False] * (self.n_predator + 1)
-            self.status_changed = [agent in self.relevant_agents for agent in self.agents]
+            self.status_changed = [True if agent in self.relevant_agents else False for agent in self.agents]
         else:
             truncated = [False] * len(self.relevant_agents)
 
